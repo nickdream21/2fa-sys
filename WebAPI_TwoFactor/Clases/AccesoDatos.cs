@@ -18,23 +18,34 @@ namespace WebAPI_TwoFactor.Clases
         /// <returns>Devuelve un objeto DataTable con los resultados obtenidos tras ejecución de la consulta.</returns>
         public static DataTable GetDataTable(string SQL, string[] parametros)
         {
+            DataTable dt = new DataTable();
             try
             {
-                SqlConnection conexion = new SqlConnection(cadenaConexion);
-                SqlCommand comando = new SqlCommand(SQL, conexion);
-                for (int i = 0; i < parametros.Length; i++)
-                    comando.Parameters.Add(new SqlParameter(parametros[i].Split(':')[0], parametros[i].Split(':')[1]));
-                SqlDataAdapter da = new SqlDataAdapter(comando);
-                DataSet ds = new DataSet();
-                da.Fill(ds);
-                conexion.Close();
-                da.Dispose();
-                conexion.Dispose();
-                return ds.Tables[0];
+                using (SqlConnection conexion = new SqlConnection(cadenaConexion))
+                {
+                    conexion.Open(); // Abrir conexión primero
+
+                    using (SqlCommand comando = new SqlCommand(SQL, conexion))
+                    {
+                        // Agregar parámetros
+                        for (int i = 0; i < parametros.Length; i++)
+                        {
+                            string[] parts = parametros[i].Split(':');
+                            comando.Parameters.AddWithValue(parts[0], parts[1]);
+                        }
+
+                        using (SqlDataAdapter da = new SqlDataAdapter(comando))
+                        {
+                            da.Fill(dt);
+                        }
+                    }
+                }
+                return dt;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                throw;
+                // Para debug
+                throw new Exception($"Error en GetDataTable: {ex.Message}\nSQL: {SQL}\nConexión: {cadenaConexion}", ex);
             }
         }
 
@@ -115,6 +126,30 @@ namespace WebAPI_TwoFactor.Clases
             con.Open();
             cmd.ExecuteNonQuery();
             con.Close();
+        }
+
+        /// <summary>
+        /// Ejecutar un comando SQL en la base de datos con parámetros, sin devolución de resultados.
+        /// </summary>
+        /// <param name="SQL"></param>
+        /// <param name="parametros">Array de string con formato: nombre:valor</param>
+        public static void ExecuteQueryWithParams(string SQL, string[] parametros)
+        {
+            using (SqlConnection conexion = new SqlConnection(cadenaConexion))
+            {
+                using (SqlCommand comando = new SqlCommand(SQL, conexion))
+                {
+                    // Agregar parámetros
+                    for (int i = 0; i < parametros.Length; i++)
+                    {
+                        string[] parts = parametros[i].Split(':');
+                        comando.Parameters.AddWithValue(parts[0], parts[1]);
+                    }
+
+                    conexion.Open();
+                    comando.ExecuteNonQuery();
+                }
+            }
         }
 
         #endregion

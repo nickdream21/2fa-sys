@@ -2,40 +2,43 @@
 using TwoFactorAuthNet;
 using TwoFactorAuthNet.Providers.Qr;
 using WebAPI_TwoFactor.Clases;
+using Microsoft.Extensions.Configuration;
 
 namespace WebAPI_TwoFactor.Controllers
 {
-    public class TwoFactorController : Controller
+    [ApiController]
+    [Route("api/[controller]")]
+    public class TwoFactorController : ControllerBase
     {
-        public IActionResult Index()
+        private readonly IConfiguration _configuration;
+
+        public TwoFactorController(IConfiguration configuration)
         {
-            return View();
+            _configuration = configuration;
         }
 
-        [HttpGet, Route("GetQRCode")]
-        public string GetQRCode(string email)
+        [HttpGet("GetQRCode")]
+        public ActionResult<string> GetQRCode(string email)
         {
             var tfa = new TwoFactorAuth("ManuelToscanoDEV", 6, 30, Algorithm.SHA256, new ImageChartsQrCodeProvider());
             var secret = tfa.CreateSecret(160);
 
-            Usuarios usu = new Usuarios();
+            Usuarios usu = new Usuarios(_configuration);
             usu.SetSecret(email, secret);
-            usu = null;
 
             string imgQR = tfa.GetQrCodeImageAsDataUri(email, secret);
             string imgHTML = $"<img src='{imgQR}'>";
-            return imgHTML;
+            return Ok(imgHTML);
         }
 
-        [HttpGet, Route("GetQRCodeAsImage")]
+        [HttpGet("GetQRCodeAsImage")]
         public FileContentResult GetQRCodeAsImage(string email)
         {
             var tfa = new TwoFactorAuth("ManuelToscanoDEV", 6, 30, Algorithm.SHA256, new ImageChartsQrCodeProvider());
             var secret = tfa.CreateSecret(160);
 
-            Usuarios usu = new Usuarios();
+            Usuarios usu = new Usuarios(_configuration);
             usu.SetSecret(email, secret);
-            usu = null;
 
             string imgQR = tfa.GetQrCodeImageAsDataUri(email, secret);
             imgQR = imgQR.Replace("data:image/png;base64,", "");
@@ -43,17 +46,19 @@ namespace WebAPI_TwoFactor.Controllers
             return File(picture, "image/png");
         }
 
-        [HttpGet, Route("ValidarQRCode")]
-        public bool ValidarCodigo(string email, string code)
+        [HttpGet("ValidarCodigo")]
+        public ActionResult<bool> ValidarCodigo(string email, string code)
         {
-            Usuarios usu = new Usuarios();
+            Usuarios usu = new Usuarios(_configuration);
             string secret = usu.GetSecret(email);
-            usu = null;
+
+            if (string.IsNullOrEmpty(secret))
+            {
+                return BadRequest("Usuario no encontrado o sin configuración 2FA");
+            }
 
             var tfa = new TwoFactorAuth("ManuelToscanoDEV", 6, 30, Algorithm.SHA256);
-            return tfa.VerifyCode(secret, code);
+            return Ok(tfa.VerifyCode(secret, code));
         }
-
-
     }
 }
